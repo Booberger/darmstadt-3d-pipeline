@@ -140,15 +140,15 @@ os.makedirs("data/processed", exist_ok=True)
 points  = np.asarray(pcd.points,  dtype=np.float32)
 normals = np.asarray(pcd.normals, dtype=np.float32)
 colors  = np.asarray(pcd.colors,  dtype=np.float32)
-hoehe   = points[:, 2:3]
+#hoehe   = points[:, 2:3]
 
-# Features fuer Random Forest: XYZ + RGB + Hoehe + VDVI
+# Features fuer Random Forest: XYZ + RGB + VDVI
 r = colors[:, 0:1]
 g = colors[:, 1:2]
 b = colors[:, 2:3]
 nenner = 2*g + r + b + 1e-8
 vdvi   = (2*g - r - b) / nenner
-features = np.hstack([points, colors, hoehe, vdvi])  # 8 Features
+features = np.hstack([points, colors, vdvi])  # 7 Features
 
 daten = {
     "points":    points,

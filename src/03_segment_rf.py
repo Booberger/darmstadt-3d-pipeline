@@ -108,13 +108,12 @@ def lese_ply_mit_labels(filepath, max_punkte=None):
 
 def extrahiere_features(xyz, rgb):
     xyz_norm = xyz - xyz.mean(axis=0)
-    hoehe    = xyz_norm[:, 2:3]
     r = rgb[:, 0:1]
     g = rgb[:, 1:2]
     b = rgb[:, 2:3]
     nenner = 2*g + r + b + 1e-8
     vdvi   = (2*g - r - b) / nenner
-    features = np.hstack([xyz_norm, rgb, hoehe, vdvi])
+    features = np.hstack([xyz_norm, rgb, vdvi])
     return features.astype(np.float32)
 
 
@@ -177,7 +176,7 @@ joblib.dump(rf, MODEL_FILE)
 print(f"Modell gespeichert: {MODEL_FILE}")
 
 print("\nFeature Importance:")
-namen = ["x_norm","y_norm","z_norm","r","g","b","hoehe","vdvi"]
+namen = ["x_norm","y_norm","z_norm","r","g","b","vdvi"]
 for name, imp in sorted(zip(namen, rf.feature_importances_),
                         key=lambda x: x[1], reverse=True):
     print(f"  {name:8s}: {imp:.4f}")
