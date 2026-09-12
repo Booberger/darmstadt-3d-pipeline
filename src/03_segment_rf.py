@@ -43,7 +43,7 @@ KLASSEN_MAPPING = {
     6:  3,  # rail             -> strasse
     7:  3,  # traffic roads    -> strasse
     8:  0,  # street furniture -> boden
-    9:  0,  # cars             -> boden
+    9:  3,  # cars             -> strasse
     10: 3,  # footpath         -> strasse
     11: 3,  # bikes            -> strasse
     12: 0,  # water            -> boden

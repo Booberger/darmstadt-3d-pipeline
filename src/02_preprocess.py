@@ -97,7 +97,7 @@ pcd, ind = pcd.remove_statistical_outlier(
 )
 nachher = len(pcd.points)
 
-# Intensity ebenfalls filtern
+# Intensity ebenfalls filtern. Das Array der Intensitäten wird auf die Indizes der gefilterten Punkte reduziert.
 intensity = intensity[ind]
 
 print(f"Vor Filterung:  {vorher:,} Punkte")
