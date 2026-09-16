@@ -18,7 +18,7 @@ import os
 INPUT_FILE  = "data/processed/ausschnitt_100m.laz"
 OUTPUT_FILE = "data/processed/preprocessed.npy"
 
-VOXEL_SIZE          = 0.25
+VOXEL_SIZE          = 0.25 #Normal 0.25
 OUTLIER_NEIGHBORS   = 20
 OUTLIER_STD_RATIO   = 2.0
 

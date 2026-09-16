@@ -14,6 +14,7 @@ import time
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 import joblib
+from sklearn.neighbors import KNeighborsClassifier
 
 # Konfiguration
 TRAIN_FILES = [
@@ -207,6 +208,11 @@ for test_file in TEST_FILES:
 
     alle_y_true.append(labels_t)
     alle_y_pred.append(y_pred_t)
+    
+print("Klassenverteilung Testdaten:")
+unique, counts = np.unique(np.concatenate(alle_y_true), return_counts=True)
+for k, c in zip(unique, counts):
+    print(f"  {k} {KLASSEN[k]:12s}: {c:,} ({c/sum(counts)*100:.1f}%)")
 
 # Gesamt-Metriken ueber alle Testbloecke
 if alle_y_true:
@@ -236,14 +242,17 @@ rgb_da  = darmstadt.get('colors', np.zeros((len(xyz_da), 3), dtype=np.float32)).
 
 print(f"Darmstadt Punkte: {len(xyz_da):,}")
 y_da = rf.predict(extrahiere_features(xyz_da, rgb_da))
+knn = KNeighborsClassifier(n_neighbors=10, n_jobs=-1)
+knn.fit(xyz_da, y_da)
+y_da_smooth = knn.predict(xyz_da)
 
 print(f"Klassenverteilung Darmstadt:")
 for k, name in KLASSEN.items():
-    n = np.sum(y_da == k)
-    print(f"  {k} {name:12s}: {n:>6,} ({n/len(y_da)*100:.1f}%)")
+    n = np.sum(y_da_smooth == k)
+    print(f"  {k} {name:12s}: {n:>6,} ({n/len(y_da_smooth)*100:.1f}%)")
 
 np.save("data/processed/darmstadt_pred.npy",
-        {"xyz": xyz_da, "normals": normals, "labels": y_da, "colors": rgb_da},
+        {"xyz": xyz_da, "normals": normals, "labels": y_da_smooth, "colors": rgb_da},
         allow_pickle=True)
 print(f"\nDarmstadt-Segmentierung gespeichert: data/processed/darmstadt_pred.npy")
 
