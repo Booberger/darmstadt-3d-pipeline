@@ -16,10 +16,9 @@ OUTPUT_FILE = "data/processed/ausschnitt_100m.laz"
 AUSSCHNITT_METER = 100   # 100m x 100m
 CHUNK_SIZE       = 100_000  # 100k Punkte pro Chunk - sehr konservativ
 
-# ── Schritt 1: Metadaten lesen ───────────────────────────────────────────────
-print("=" * 60)
+#Schritt 1: Metadaten lesen ───────────────────────────────────────────────
 print("SCHRITT 1: Datei-Informationen")
-print("=" * 60)
+print("-" * 60)
 
 with laspy.open(INPUT_FILE) as f:
     header = f.header
@@ -44,9 +43,9 @@ with laspy.open(INPUT_FILE) as f:
 print(f"\nAusschnitt: X {x_min:.0f}-{x_max:.0f}, Y {y_min:.0f}-{y_max:.0f}")
 
 # ── Schritt 2: Ausschnitt direkt in Datei schreiben ──────────────────────────
-print("\n" + "=" * 60)
+print("\n")
 print("SCHRITT 2: Ausschnitt extrahieren (direkt schreiben)")
-print("=" * 60)
+print("-" * 60)
 
 os.makedirs("data/processed", exist_ok=True)
 
@@ -65,8 +64,8 @@ with laspy.open(INPUT_FILE) as reader:
 
             # Debug: erste Chunk anzeigen
             if chunk_nr == 1:
-                print(f"DEBUG - Erste Chunk X: {float(chunk.x.min()):.2f} - {float(chunk.x.max()):.2f}")
-                print(f"DEBUG - Erste Chunk Y: {float(chunk.y.min()):.2f} - {float(chunk.y.max()):.2f}")
+                #print(f"DEBUG - Erste Chunk X: {float(chunk.x.min()):.2f} - {float(chunk.x.max()):.2f}")
+                #print(f"DEBUG - Erste Chunk Y: {float(chunk.y.min()):.2f} - {float(chunk.y.max()):.2f}")
 
             maske = (
                 (chunk.x >= x_min) & (chunk.x <= x_max) &
@@ -81,8 +80,8 @@ with laspy.open(INPUT_FILE) as reader:
                 print(f"  {prozent:.1f}% | {punkte_gesamt:,} Punkte")
         writer.close()
 
-print(f"\nFertig!")
-print(f"Punkte im Ausschnitt: {punkte_gesamt:,}")
+#print(f"\nFertig!")
+print(f"\nPunkte im Ausschnitt: {punkte_gesamt:,}")
 if punkte_gesamt > 0:
     dichte = punkte_gesamt / (AUSSCHNITT_METER ** 2)
     print(f"Punktdichte: {dichte:.1f} Punkte/m²")
@@ -91,6 +90,6 @@ if punkte_gesamt > 0:
 else:
     print("FEHLER: Keine Punkte im Ausschnitt gefunden.")
 
-print("\n" + "=" * 60)
+print("\n")
 print("FERTIG - Weiter mit 02_preprocess.py")
-print("=" * 60)
+print("-" * 60)

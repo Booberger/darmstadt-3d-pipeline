@@ -23,11 +23,10 @@ OUTLIER_NEIGHBORS   = 20
 OUTLIER_STD_RATIO   = 2.0
 
 # ── Schritt 1: LAZ einlesen ───────────────────────────────────────────────────
-print("=" * 60)
 print("SCHRITT 1: Punktwolke einlesen")
-print("=" * 60)
+print("-" * 60)
 
-print("Lese LAZ-Datei (chunkweise um RAM zu schonen)...")
+print("Lese LAZ-Datei..")
 
 xyz_list       = []
 rgb_list       = []
@@ -72,9 +71,9 @@ print(f"RAM XYZ: {xyz.nbytes/1e6:.1f} MB")
 print(f"RAM RGB: {rgb.nbytes/1e6:.1f} MB")
 
 # ── Schritt 2: Open3D PointCloud erstellen ───────────────────────────────────
-print("\n" + "=" * 60)
+print("\n")
 print("SCHRITT 2: Koordinaten normalisieren")
-print("=" * 60)
+print("-" * 60)
 
 pcd = o3d.geometry.PointCloud()
 pcd.points = o3d.utility.Vector3dVector(xyz)
@@ -86,9 +85,9 @@ print(f"Koordinaten zentriert. Urspruenglicher Mittelpunkt: {center}")
 print(f"Neuer Mittelpunkt: {pcd.get_center()}")
 
 # ── Schritt 3: Rauschfilterung ───────────────────────────────────────────────
-print("\n" + "=" * 60)
+print("\n")
 print("SCHRITT 3: Rauschfilterung (Statistical Outlier Removal)")
-print("=" * 60)
+print("-" * 60)
 
 vorher = len(pcd.points)
 pcd, ind = pcd.remove_statistical_outlier(
@@ -105,9 +104,9 @@ print(f"Nach Filterung: {nachher:,} Punkte")
 print(f"Entfernt:       {vorher - nachher:,} Ausreisser ({(vorher-nachher)/vorher*100:.2f}%)")
 
 # ── Schritt 4: Downsampling ──────────────────────────────────────────────────
-print("\n" + "=" * 60)
+print("\n")
 print(f"SCHRITT 4: Voxel-Grid-Downsampling (Voxelgroesse: {VOXEL_SIZE}m)")
-print("=" * 60)
+print("-" * 60)
 
 vorher = len(pcd.points)
 pcd = pcd.voxel_down_sample(voxel_size=VOXEL_SIZE)
@@ -119,9 +118,9 @@ print(f"Nach Downsampling: {nachher:,} Punkte")
 print(f"Reduktion: {(1 - nachher/vorher)*100:.1f}%")
 
 # ── Schritt 5: Normalen schaetzen ────────────────────────────────────────────
-print("\n" + "=" * 60)
+print("\n")
 print("SCHRITT 5: Normalen schaetzen")
-print("=" * 60)
+print("-" * 60)
 
 pcd.estimate_normals(
     search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=1.0, max_nn=30)
@@ -131,9 +130,9 @@ pcd.orient_normals_consistent_tangent_plane(30)
 print("Normalen geschaetzt und nach oben orientiert.")
 
 # ── Schritt 6: Als numpy speichern ──────────────────────────────────────────
-print("\n" + "=" * 60)
+print("\n")
 print("SCHRITT 6: Ergebnis speichern")
-print("=" * 60)
+print("-" * 60)
 
 os.makedirs("data/processed", exist_ok=True)
 
@@ -170,6 +169,6 @@ ply_file = "data/processed/preprocessed.ply"
 o3d.io.write_point_cloud(ply_file, pcd)
 print(f"PLY gespeichert: {ply_file}")
 
-print("\n" + "=" * 60)
+print("\n")
 print("FERTIG - Weiter mit 03_segment_rf.py")
-print("=" * 60)
+print("-" * 60)

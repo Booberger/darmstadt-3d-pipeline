@@ -134,9 +134,8 @@ def berechne_metriken(y_true, y_pred):
 
 
 # SCHRITT 1: Training
-print("=" * 60)
 print("SCHRITT 1: Training (SensatUrban, 4 Klassen)")
-print("=" * 60)
+print("-" * 60)
 
 np.random.seed(42)
 X_liste, y_liste = [], []
@@ -183,9 +182,9 @@ for name, imp in sorted(zip(namen, rf.feature_importances_),
     print(f"  {name:8s}: {imp:.4f}")
 
 # SCHRITT 2: Evaluation
-print("\n" + "=" * 60)
+print("\n")
 print("SCHRITT 2: Evaluation (SensatUrban Test-Bloecke)")
-print("=" * 60)
+print("-" * 60)
 
 alle_y_true = []
 alle_y_pred = []
@@ -231,9 +230,9 @@ np.save("data/processed/test_pred.npy",
 print(f"\nTest-Ergebnis gespeichert: data/processed/test_pred.npy")
 
 # SCHRITT 3: Inferenz Darmstadt
-print("\n" + "=" * 60)
+print("\n")
 print("SCHRITT 3: Inferenz auf Darmstaedter Daten")
-print("=" * 60)
+print("-" * 60)
 
 darmstadt = np.load(DARMSTADT_FILE, allow_pickle=True).item()
 xyz_da  = darmstadt['points'].astype(np.float32)
@@ -256,6 +255,6 @@ np.save("data/processed/darmstadt_pred.npy",
         allow_pickle=True)
 print(f"\nDarmstadt-Segmentierung gespeichert: data/processed/darmstadt_pred.npy")
 
-print("\n" + "=" * 60)
+print("\n")
 print("FERTIG - Weiter mit 04_reconstruct.py")
-print("=" * 60)
+print("-" * 60)

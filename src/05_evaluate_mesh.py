@@ -27,9 +27,8 @@ KLASSEN = {
 }
 
 # ── Daten laden ──────────────────────────────────────────────────────────────
-print("=" * 60)
 print("MESH-EVALUATION")
-print("=" * 60)
+print("-" * 60)
 
 preproc = np.load(PREPROC_FILE, allow_pickle=True).item()
 pred    = np.load(PRED_FILE,    allow_pickle=True).item()
@@ -93,9 +92,9 @@ for klasse_id, name in KLASSEN.items():
     print(f"{name:12s} | {n_punkte:>8,} | {vollstaendigkeit:>13.1f}% | {mittel:>10.3f} | {maximum:>8.3f} | {n_lod0:>14,} | {n_lod1:>14,} | {n_lod2:>14,}")
 
 # ── Gesamtauswertung ─────────────────────────────────────────────────────────
-print("\n" + "=" * 60)
+print("\n")
 print("ZUSAMMENFASSUNG")
-print("=" * 60)
+print("-" * 60)
 
 if ergebnisse:
     gesamt_lod0 = sum(e["lod0"] for e in ergebnisse.values())
@@ -111,9 +110,9 @@ if ergebnisse:
     print(f"Mittlerer Abstand (alle Klassen): {gesamt_mit:.3f}m")
 
 # ── Dateigroessen ─────────────────────────────────────────────────────────────
-print("\n" + "=" * 60)
+print("\n")
 print("DATEIGROESSEN")
-print("=" * 60)
+print("-" * 60)
 print(f"\n{'Klasse':12s} | {'LOD0 PLY':>10s} | {'LOD1 PLY':>10s} | {'LOD2 PLY':>10s} | {'LOD0 GLB':>10s}")
 print("-" * 60)
 
@@ -130,6 +129,6 @@ for name in KLASSEN.values():
 
 print(f"\nGesamtgrösse LOD0 (alle Klassen): {gesamt_groesse:.1f} MB")
 
-print("\n" + "=" * 60)
+print("\n")
 print("FERTIG")
-print("=" * 60)
+print("-" * 60)

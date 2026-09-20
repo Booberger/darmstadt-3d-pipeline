@@ -41,6 +41,7 @@ KLASSEN_FARBEN = {
     3: [0.3, 0.3, 0.3],
 }
 
+
 # ── Hilfsfunktionen ──────────────────────────────────────────────────────────
 
 def filtere_artefakte(pcd):
@@ -133,10 +134,9 @@ def erzeuge_lod(mesh, farbe, n, reduktion, suffix, output_dir, name):
     return mesh_lod, len(mesh_lod.triangles), os.path.getsize(ply_path)/1e6
 
 
-# ── Schritt 1: Daten laden ───────────────────────────────────────────────────
-print("=" * 60)
+#Schritt 1: Daten laden ───────────────────────────────────────────────────
 print("SCHRITT 1: Segmentierungsergebnis laden")
-print("=" * 60)
+print("-" * 60)
 
 daten   = np.load(INPUT_PRED,    allow_pickle=True).item()
 preproc = np.load(INPUT_PREPROC, allow_pickle=True).item()
@@ -160,9 +160,9 @@ for k, name in KLASSEN.items():
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # ── Schritt 2: Mesh-Rekonstruktion ──────────────────────────────────────────
-print("\n" + "=" * 60)
+print("\n")
 print("SCHRITT 2: Mesh-Rekonstruktion mit Artefaktfilterung")
-print("=" * 60)
+print("-" * 60)
 
 meshes = {}
 for klasse_id, name in KLASSEN.items():
@@ -173,9 +173,9 @@ for klasse_id, name in KLASSEN.items():
         meshes[name] = (klasse_id, mesh, pcd_rgb)
 
 # ── Schritt 3: LOD-Generierung ───────────────────────────────────────────────
-print("\n" + "=" * 60)
+print("\n")
 print("SCHRITT 3: 3-stufige LOD-Generierung")
-print("=" * 60)
+print("-" * 60)
 print(f"{'Klasse':12s} | {'LOD0':>10s} | {'LOD1 (10%)':>12s} | {'LOD2 (1%)':>11s}")
 print("-" * 55)
 
@@ -199,9 +199,9 @@ for name, (klasse_id, mesh, _) in meshes.items():
     print(f"{name:12s} | {n:>7,} ({g0:.1f}MB) | {n1:>7,} ({g1:.1f}MB) | {n2:>6,} ({g2:.1f}MB)")
 
 # ── Schritt 4: glTF Export mit echten RGB-Farben ─────────────────────────────
-print("\n" + "=" * 60)
+print("\n")
 print("SCHRITT 4: glTF Export (Echte RGB-Farben)")
-print("=" * 60)
+print("-" * 60)
 
 if colors is not None:
     for name, (klasse_id, mesh, pcd_rgb) in meshes.items():
@@ -240,14 +240,14 @@ else:
     print("Keine RGB-Daten verfuegbar.")
 
 # ── Zusammenfassung ──────────────────────────────────────────────────────────
-print("\n" + "=" * 60)
+print("\n")
 print("ZUSAMMENFASSUNG")
-print("=" * 60)
+print("-" * 60)
 print("Ausgabedateien pro Klasse:")
 print("  *_LOD0/LOD1/LOD2.ply     - Klassenfarben (MeshLab)")
 print("  *_LOD0/LOD1/LOD2.glb     - Klassenfarben (Game Engine)")
 print("  *_LOD0/LOD1/LOD2_rgb.glb - Echte RGB-Farben (Game Engine)")
 
-print("\n" + "=" * 60)
+print("\n")
 print("FERTIG - Output in data/output/")
-print("=" * 60)
+print("-" * 60)
