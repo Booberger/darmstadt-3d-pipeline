@@ -2,10 +2,21 @@
 03_segment_rf.py
 ----------------
 Schritt 3 der Pipeline: Semantische Segmentierung mittels Random Forest.
-- 4 Klassen: Boden, Vegetation, Gebaeude, Strasse (analog zu Ballouch 2024)
-- Training auf annotierten SensatUrban-Bloecken
-- Evaluation auf Test-Block (mIoU, F1, OA)
-- Inferenz auf Darmstaedter Punktwolke
+
+Eingabe:  data/sensaturban/train/*.ply  (annotierte Trainingsblöcke)
+          data/sensaturban/test/*.ply   (annotierte Testbloecke)
+          data/processed/preprocessed.npy (vorverarbeitete Darmstädter Punktwolke)
+Ausgabe:  data/processed/rf_model.joblib   (trainiertes Modell)
+          data/processed/test_pred.npy     (Vorhersagen auf Testdaten)
+          data/processed/darmstadt_pred.npy (Segmentierung der Darmstädter Daten)
+
+Verarbeitungsschritte:
+  1. Training auf 5 SensatUrban-Blocken (Birmingham + Cambridge)
+  2. Evaluation auf 2 Testblöcken (mIoU, OA pro Klasse)
+  3. Inferenz auf Darmstädter Daten mit anschließender Majority-Vote-Glättung
+
+Klassenschema (4 Klassen analog zu Ballouch et al. 2024):
+  0 = Boden, 1 = Vegetation, 2 = Gebäude, 3 = Strasse
 """
 
 import numpy as np
@@ -13,10 +24,10 @@ import os
 import time
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
-import joblib
 from sklearn.neighbors import KNeighborsClassifier
+import joblib
 
-# Konfiguration
+# Konfiguration 
 TRAIN_FILES = [
     "data/sensaturban/train/birmingham_block_1.ply",
     "data/sensaturban/train/birmingham_block_3.ply",
@@ -24,7 +35,6 @@ TRAIN_FILES = [
     "data/sensaturban/train/cambridge_block_10.ply",
     "data/sensaturban/train/cambridge_block_26.ply",
 ]
-#TEST_FILE      = "data/sensaturban/test/birmingham_block_4.ply"
 TEST_FILES = [
     "data/sensaturban/test/birmingham_block_4.ply",
     "data/sensaturban/test/cambridge_block_20.ply",
@@ -33,7 +43,17 @@ DARMSTADT_FILE = "data/processed/preprocessed.npy"
 MODEL_FILE     = "data/processed/rf_model.joblib"
 OUTPUT_DIR     = "data/output"
 
-# Mapping SensatUrban (13 Klassen) -> 4 Hauptklassen
+MAX_PUNKTE_TRAINING = 1_000_000  # Punkte pro Trainingsblock
+MAX_PUNKTE_TEST     = 500_000    # Punkte pro Testblock
+
+# Mapping: SensatUrban 13 Klassen -> 4 Hauptklassen
+# Begründung der Zuordnung:
+#   walls -> gebaeude:        Wände sind Teil von Gebäuden
+#   bridge/parking/rail/      Alle verkehrsbezogenen Flächen -> strasse
+#     traffic roads/footpath/
+#     bikes/cars -> strasse
+#   street furniture -> boden: Kleines Mobiliar wird dem Boden zugeordnet
+#   water -> boden:            Wasserflaechen liegen auf Bodenhoehe
 KLASSEN_MAPPING = {
     0:  0,  # ground           -> boden
     1:  1,  # high vegetation  -> vegetation
@@ -52,20 +72,27 @@ KLASSEN_MAPPING = {
 
 KLASSEN = {0: "boden", 1: "vegetation", 2: "gebaeude", 3: "strasse"}
 
+# Klassenfarben für spätere Visualisierung (RGB 0-1)
 KLASSEN_FARBEN = {
-    0: [0.6, 0.5, 0.3],
-    1: [0.2, 0.7, 0.2],
-    2: [0.8, 0.8, 0.8],
-    3: [0.4, 0.4, 0.4],
+    0: [0.6, 0.5, 0.3],  # Braun  - Boden
+    1: [0.2, 0.7, 0.2],  # Gruen  - Vegetation
+    2: [0.8, 0.8, 0.8],  # Grau   - Gebaeude
+    3: [0.4, 0.4, 0.4],  # Dunkel - Strasse
 }
 
-MAX_PUNKTE_TRAINING = 1_000_000
-MAX_PUNKTE_TEST     = 500_000
-
+# Hilfsfunktionen 
 
 def lese_ply_mit_labels(filepath, max_punkte=None):
+    """
+    Liest eine binaere PLY-Datei mit XYZ, RGB und optionalem Klassenlabel.
+    Der PLY-Header wird manuell geparst um die Datentypen zu bestimmen.
+    Bei mehr Punkten als max_punkte wird zufaellig subgesampelt.
+    Gibt xyz (N,3), rgb (N,3) und labels (N,) oder None zurueck.
+    """
     print(f"  Lese: {filepath}")
     with open(filepath, 'rb') as f:
+
+        # PLY-Header parsen: Punktanzahl und Attributnamen/Typen ermitteln
         properties = []
         num_vertices = 0
         while True:
@@ -81,12 +108,14 @@ def lese_ply_mit_labels(filepath, max_punkte=None):
         print(f"  Punkte gesamt: {num_vertices:,}")
         print(f"  Properties: {[p[1] for p in properties]}")
 
+        # NumPy-Datentypen aus PLY-Typen ableiten
         dtype_map = {
             'float32': np.float32, 'float64': np.float64,
             'uint8': np.uint8, 'int32': np.int32, 'uint32': np.uint32,
         }
         dt = np.dtype([(p[1], dtype_map.get(p[0], np.float32)) for p in properties])
 
+        # Binärdaten einlesen ggf. zufäällig subsampling
         if max_punkte and num_vertices > max_punkte:
             daten = np.frombuffer(f.read(num_vertices * dt.itemsize), dtype=dt)
             idx = np.random.choice(len(daten), max_punkte, replace=False)
@@ -98,6 +127,7 @@ def lese_ply_mit_labels(filepath, max_punkte=None):
     xyz = np.column_stack([daten['x'], daten['y'], daten['z']]).astype(np.float32)
     rgb = np.column_stack([daten['red'], daten['green'], daten['blue']]).astype(np.float32) / 255.0
 
+    # Klassenlabels einlesen und auf 4 Hauptklassen mappen (falls vorhanden)
     labels = None
     if 'class' in [p[1] for p in properties]:
         labels_roh = daten['class'].astype(np.int32)
@@ -108,22 +138,36 @@ def lese_ply_mit_labels(filepath, max_punkte=None):
 
 
 def extrahiere_features(xyz, rgb):
+    """
+    Berechnet einen 7-dimensionalen Feature-Vektor pro Punkt:
+      - xyz_norm (3): normalisierte XYZ-Koordinaten (Schwerpunkt auf Ursprung)
+      - rgb     (3): RGB-Farbwerte (0-1)
+      - vdvi    (1): Visible-band Difference Vegetation Index
+                     Formel nach Oniga et al. (2022): (2G-R-B)/(2G+R+B)
+                     Unterscheidet Vegetation (positiv) von Nicht-Vegetation (negativ)
+    """
     xyz_norm = xyz - xyz.mean(axis=0)
     r = rgb[:, 0:1]
     g = rgb[:, 1:2]
     b = rgb[:, 2:3]
-    nenner = 2*g + r + b + 1e-8
+    nenner = 2*g + r + b + 1e-8  # 1e-8 verhindert Division durch Null
     vdvi   = (2*g - r - b) / nenner
     features = np.hstack([xyz_norm, rgb, vdvi])
     return features.astype(np.float32)
 
 
 def berechne_metriken(y_true, y_pred):
+    """
+    Berechnet Overall Accuracy (OA) und Mean IoU (mIoU) pro Klasse.
+    IoU_i = TP_i / (TP_i + FP_i + FN_i)
+    mIoU  = Mittelwert der IoU-Werte aller vorhandenen Klassen
+    Gibt oa (float), miou (float) und iou_werte (dict) zurueck.
+    """
     oa = accuracy_score(y_true, y_pred)
     iou_werte = {}
     for k in sorted(KLASSEN.keys()):
         if np.sum(y_true == k) == 0:
-            continue
+            continue  # Klasse nicht im Testdatensatz vorhanden
         tp = np.sum((y_true == k) & (y_pred == k))
         fp = np.sum((y_true != k) & (y_pred == k))
         fn = np.sum((y_true == k) & (y_pred != k))
@@ -132,12 +176,15 @@ def berechne_metriken(y_true, y_pred):
     miou = np.mean(list(iou_werte.values()))
     return oa, miou, iou_werte
 
-
-# SCHRITT 1: Training
+# Schritt 1: Training 
+# 5 SensatUrban-Blocken werden eingelesen und je auf MAX_PUNKTE_TRAINING
+# subgesampelt. Features werden extrahiert und zu einem Trainingsarray
+# zusammengefuehrt (5 Mio Punkte x 7 Features).
+# Random Forest mit class_weight='balanced' gleicht Klassenimbalance aus.
 print("SCHRITT 1: Training (SensatUrban, 4 Klassen)")
 print("-" * 60)
 
-np.random.seed(42)
+np.random.seed(42)  # Reproduzierbarkeit des Subsampling
 X_liste, y_liste = [], []
 
 for filepath in TRAIN_FILES:
@@ -160,12 +207,12 @@ for k, name in KLASSEN.items():
 print("\nTrainiere Random Forest (100 Baeume, max_depth=20)...")
 start = time.time()
 rf = RandomForestClassifier(
-    n_estimators=100,
-    max_depth=20,
-    min_samples_leaf=5,
-    n_jobs=-1,
-    random_state=42,
-    class_weight='balanced',  # NEU: Klassenimbalance ausgleichen
+    n_estimators=100,       # Anzahl Entscheidungsbaeume
+    max_depth=20,           # Maximale Baumtiefe
+    min_samples_leaf=5,     # Mindestpunkte pro Blattknoten
+    n_jobs=-1,              # Alle CPU-Kerne nutzen
+    random_state=42,        # Reproduzierbarkeit
+    class_weight='balanced', # Seltene Klassen hoeher gewichten
     verbose=1
 )
 rf.fit(X_train, y_train)
@@ -175,15 +222,18 @@ os.makedirs("data/processed", exist_ok=True)
 joblib.dump(rf, MODEL_FILE)
 print(f"Modell gespeichert: {MODEL_FILE}")
 
+# Feature Importance: gibt an wie stark jedes Feature zur Klassifikation beitraegt
 print("\nFeature Importance:")
-namen = ["x_norm","y_norm","z_norm","r","g","b","vdvi"]
+namen = ["x_norm", "y_norm", "z_norm", "r", "g", "b", "vdvi"]
 for name, imp in sorted(zip(namen, rf.feature_importances_),
                         key=lambda x: x[1], reverse=True):
     print(f"  {name:8s}: {imp:.4f}")
 
-# SCHRITT 2: Evaluation
-print("\n")
-print("SCHRITT 2: Evaluation (SensatUrban Test-Bloecke)")
+# ── Schritt 2: Evaluation ─────────────────────────────────────────────────────
+# Beide Testblöcke werden einzeln und gesamt evaluiert.
+# Der Birmingham-Block testet Domänengeneralisierung,
+# der Cambridge-Block testet Generalisierung innerhalb aehnlicher Trainingsdomaene.
+print("\nSCHRITT 2: Evaluation (SensatUrban Test-Blöcke)")
 print("-" * 60)
 
 alle_y_true = []
@@ -207,18 +257,19 @@ for test_file in TEST_FILES:
 
     alle_y_true.append(labels_t)
     alle_y_pred.append(y_pred_t)
-    
+
+# Klassenverteilung der Testdaten ausgeben (f ür Berechnung des Zufalls-mIoU)
 print("Klassenverteilung Testdaten:")
 unique, counts = np.unique(np.concatenate(alle_y_true), return_counts=True)
 for k, c in zip(unique, counts):
     print(f"  {k} {KLASSEN[k]:12s}: {c:,} ({c/sum(counts)*100:.1f}%)")
 
-# Gesamt-Metriken ueber alle Testbloecke
+# Gesamt-Metriken ueber alle Testblöcke
 if alle_y_true:
     y_true_all = np.concatenate(alle_y_true)
     y_pred_all = np.concatenate(alle_y_pred)
     oa_all, miou_all, iou_all = berechne_metriken(y_true_all, y_pred_all)
-    print(f"\nGesamt ueber alle Test-Bloecke:")
+    print(f"\nGesamt ueber alle Test-Blöcke:")
     print(f"  OA:   {oa_all*100:.2f}%")
     print(f"  mIoU: {miou_all*100:.2f}%")
     for k, iou in iou_all.items():
@@ -229,9 +280,12 @@ np.save("data/processed/test_pred.npy",
         allow_pickle=True)
 print(f"\nTest-Ergebnis gespeichert: data/processed/test_pred.npy")
 
-# SCHRITT 3: Inferenz Darmstadt
-print("\n")
-print("SCHRITT 3: Inferenz auf Darmstaedter Daten")
+# Schritt 3: Inferenz auf Darmstaedter Daten 
+# Die Darmstädter Punktwolke hat keine Ground Truth Labels
+# Der trainierte RF wird direkt fr die Inferenz verwendet
+# Anschliessend wird Majority Vote via KNN angewendet:
+#   Jeder Punkt bekommt das Label das am häufigsten unter seinen 10 naechsten Nachbarn vorkommt. Das glaettet Fehlklassifikationen an Klassengrenzen und reduziert isolierte Fehlpunkte
+print("\nSCHRITT 3: Inferenz auf Darmstädter Daten")
 print("-" * 60)
 
 darmstadt = np.load(DARMSTADT_FILE, allow_pickle=True).item()
@@ -240,21 +294,25 @@ normals = darmstadt['normals'].astype(np.float32)
 rgb_da  = darmstadt.get('colors', np.zeros((len(xyz_da), 3), dtype=np.float32)).astype(np.float32)
 
 print(f"Darmstadt Punkte: {len(xyz_da):,}")
+
+# RF-Inferenz
 y_da = rf.predict(extrahiere_features(xyz_da, rgb_da))
+
+# Majority Vote Glättung: Labels der 10 näcchsten Nachbarn per Mehrheitsentscheid
 knn = KNeighborsClassifier(n_neighbors=10, n_jobs=-1)
 knn.fit(xyz_da, y_da)
 y_da_smooth = knn.predict(xyz_da)
 
-print(f"Klassenverteilung Darmstadt:")
+print(f"Klassenverteilung Darmstadt (nach Majority Vote):")
 for k, name in KLASSEN.items():
     n = np.sum(y_da_smooth == k)
     print(f"  {k} {name:12s}: {n:>6,} ({n/len(y_da_smooth)*100:.1f}%)")
 
+# Ergebnis speichern: XYZ, Normalen, geglaettete Labels und RGB
 np.save("data/processed/darmstadt_pred.npy",
         {"xyz": xyz_da, "normals": normals, "labels": y_da_smooth, "colors": rgb_da},
         allow_pickle=True)
 print(f"\nDarmstadt-Segmentierung gespeichert: data/processed/darmstadt_pred.npy")
 
-print("\n")
-print("FERTIG - Weiter mit 04_reconstruct.py")
+print("\nFERTIG - Weiter mit 04_reconstruct.py")
 print("-" * 60)
